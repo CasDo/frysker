@@ -7,7 +7,7 @@
   xsi:type="MailApp">
 
   <Id>a3f2c1d4-8b7e-4f9a-bc23-1d5e6f7a8b9c</Id>
-  <Version>1.0.0</Version>
+  <Version>1.0.1</Version>
   <ProviderName>Frysker</ProviderName>
   <DefaultLocale>nl-NL</DefaultLocale>
   <DisplayName DefaultValue="Frysker Vertaler"/>
@@ -97,7 +97,7 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Frysker"/>
-        <bt:String id="Button.Label" DefaultValue="Oersette nei Frysk"/>
+        <bt:String id="Button.Label" DefaultValue="Frysk"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="Button.Tooltip" DefaultValue="Vertaalt de tekst van dit bericht naar it Frysk via frisian.eu"/>

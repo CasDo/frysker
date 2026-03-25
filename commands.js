@@ -9,7 +9,10 @@ async function translateToFrysk(event) {
 
   try {
     const html = await getBody(item, Office.CoercionType.Html);
-    const text = extractText(html);
+
+    // Splits de handtekening af zodat die niet vertaald wordt
+    const { bodyHtml, signatureHtml } = separateSignature(html);
+    const text = extractText(bodyHtml);
 
     if (!text.trim()) {
       await notify(item, 'info', 'De e-mail bevat geen tekst om te vertalen.');
@@ -18,7 +21,7 @@ async function translateToFrysk(event) {
     }
 
     const translation = await callFryskerAPI(text);
-    const translatedHtml = rebuildHtml(html, translation);
+    const translatedHtml = rebuildHtml(bodyHtml, translation, signatureHtml);
 
     await setBody(item, translatedHtml, Office.CoercionType.Html);
     await notify(item, 'info', 'Oersetting klear! ✓');
@@ -32,6 +35,41 @@ async function translateToFrysk(event) {
 
 // ------------------------------------------------------------
 
+/**
+ * Herkent en scheidt de Outlook-handtekening van de berichttekst.
+ * Outlook gebruikt bekende HTML-markers voor handtekeningen.
+ * Geeft { bodyHtml, signatureHtml } terug — signatureHtml is null als er geen handtekening is.
+ */
+function separateSignature(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  // Bekende Outlook-selectors voor handtekeningen (van specifiek naar algemeen)
+  const selectors = [
+    '#Signature',
+    '#signature',
+    '#appendonsend',
+    '.MsoSignature',
+    '[id^="Signature"]',
+    '[class*="MsoSignature"]',
+  ];
+
+  let signatureEl = null;
+  for (const selector of selectors) {
+    signatureEl = doc.body.querySelector(selector);
+    if (signatureEl) break;
+  }
+
+  if (!signatureEl) {
+    return { bodyHtml: html, signatureHtml: null };
+  }
+
+  // Sla de handtekening op en verwijder hem uit de DOM
+  const signatureHtml = signatureEl.outerHTML;
+  signatureEl.remove();
+
+  return { bodyHtml: doc.documentElement.outerHTML, signatureHtml };
+}
+
 /** Haalt platte tekst uit HTML met alineastructuur bewaard */
 function extractText(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -42,8 +80,8 @@ function extractText(html) {
   return (doc.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-/** Bouwt nieuwe HTML op met de vertaalde tekst, bewaart e-mailopmaak */
-function rebuildHtml(originalHtml, translatedText) {
+/** Bouwt nieuwe HTML op met de vertaalde tekst, bewaart e-mailopmaak en handtekening */
+function rebuildHtml(originalHtml, translatedText, signatureHtml) {
   const doc = new DOMParser().parseFromString(originalHtml, 'text/html');
 
   const firstDiv = doc.body.querySelector('div[style]');
@@ -57,7 +95,9 @@ function rebuildHtml(originalHtml, translatedText) {
     .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('');
 
-  doc.body.innerHTML = `<div style="${containerStyle}">${paragraphs}</div>`;
+  // Vertaalde tekst + originele handtekening ongewijzigd eronder
+  const signature = signatureHtml ? signatureHtml : '';
+  doc.body.innerHTML = `<div style="${containerStyle}">${paragraphs}</div>${signature}`;
   return doc.documentElement.outerHTML;
 }
 

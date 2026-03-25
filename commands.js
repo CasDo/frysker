@@ -20,6 +20,9 @@ async function translateToFrysk(event) {
       return;
     }
 
+    // Tijdelijke debug: toon of handtekening gevonden werd
+    await notify(item, 'info', signatureHtml ? 'Handtekening gevonden ✓' : 'Geen handtekening herkend — alles wordt vertaald');
+
     const translation = await callFryskerAPI(text);
     const translatedHtml = rebuildHtml(bodyHtml, translation, signatureHtml);
 

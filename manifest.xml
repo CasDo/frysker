@@ -10,7 +10,7 @@
   <Version>1.0.1</Version>
   <ProviderName>Frysker</ProviderName>
   <DefaultLocale>nl-NL</DefaultLocale>
-  <DisplayName DefaultValue="Frysker Vertaler"/>
+  <DisplayName DefaultValue="Frysk"/>
   <Description DefaultValue="Vertaalt e-mailtekst nei it Frysk fia frisian.eu"/>
 
   <IconUrl DefaultValue="https://casdo.github.io/frysker/icon-80.png"/>

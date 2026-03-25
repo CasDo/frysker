@@ -11,7 +11,7 @@
   <ProviderName>Frysker</ProviderName>
   <DefaultLocale>nl-NL</DefaultLocale>
   <DisplayName DefaultValue="Frysk"/>
-  <Description DefaultValue="Vertaalt e-mailtekst nei it Frysk fia frisian.eu"/>
+  <Description DefaultValue="Vertaalt e-mailtekst nei it Frysk - Tresoar - Caspar Doeser"/>
 
   <IconUrl DefaultValue="https://casdo.github.io/frysker/icon-80.png"/>
   <HighResolutionIconUrl DefaultValue="https://casdo.github.io/frysker/icon-80.png"/>

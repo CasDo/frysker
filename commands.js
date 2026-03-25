@@ -1,4 +1,4 @@
-/* global Office */
+/* global Office, DOMParser */
 
 Office.onReady(() => {
   Office.actions.associate('translateToFrysk', translateToFrysk);
@@ -8,16 +8,19 @@ async function translateToFrysk(event) {
   const item = Office.context.mailbox.item;
 
   try {
-    const body = await getBody(item);
+    const html = await getBody(item, Office.CoercionType.Html);
+    const text = extractText(html);
 
-    if (!body.trim()) {
+    if (!text.trim()) {
       await notify(item, 'info', 'De e-mail bevat geen tekst om te vertalen.');
       event.completed();
       return;
     }
 
-    const translation = await callFryskerAPI(body);
-    await setBody(item, translation);
+    const translation = await callFryskerAPI(text);
+    const translatedHtml = rebuildHtml(html, translation);
+
+    await setBody(item, translatedHtml, Office.CoercionType.Html);
     await notify(item, 'info', 'Oersetting klear! ✓');
 
   } catch (err) {
@@ -25,6 +28,37 @@ async function translateToFrysk(event) {
   }
 
   event.completed();
+}
+
+// ------------------------------------------------------------
+
+/** Haalt platte tekst uit HTML met alineastructuur bewaard */
+function extractText(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+  doc.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6').forEach(el => {
+    if (el.textContent.trim()) el.insertAdjacentText('afterend', '\n\n');
+  });
+  return (doc.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Bouwt nieuwe HTML op met de vertaalde tekst, bewaart e-mailopmaak */
+function rebuildHtml(originalHtml, translatedText) {
+  const doc = new DOMParser().parseFromString(originalHtml, 'text/html');
+
+  const firstDiv = doc.body.querySelector('div[style]');
+  const containerStyle = firstDiv
+    ? firstDiv.getAttribute('style')
+    : 'font-family: Calibri, sans-serif; font-size: 11pt;';
+
+  const paragraphs = translatedText
+    .split('\n\n')
+    .filter(p => p.trim())
+    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+
+  doc.body.innerHTML = `<div style="${containerStyle}">${paragraphs}</div>`;
+  return doc.documentElement.outerHTML;
 }
 
 // ------------------------------------------------------------
@@ -55,9 +89,9 @@ async function callFryskerAPI(text) {
 
 // ------------------------------------------------------------
 
-function getBody(item) {
+function getBody(item, coercionType) {
   return new Promise((resolve, reject) => {
-    item.body.getAsync(Office.CoercionType.Text, result => {
+    item.body.getAsync(coercionType, result => {
       result.status === Office.AsyncResultStatus.Succeeded
         ? resolve(result.value)
         : reject(new Error(result.error.message));
@@ -65,9 +99,9 @@ function getBody(item) {
   });
 }
 
-function setBody(item, text) {
+function setBody(item, content, coercionType) {
   return new Promise((resolve, reject) => {
-    item.body.setAsync(text, { coercionType: Office.CoercionType.Text }, result => {
+    item.body.setAsync(content, { coercionType }, result => {
       result.status === Office.AsyncResultStatus.Succeeded
         ? resolve()
         : reject(new Error(result.error.message));
@@ -82,8 +116,8 @@ function notify(item, type, message) {
       : Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage;
     item.notificationMessages.replaceAsync('frysker', {
       type: msgType,
+      ...(type !== 'error' && { icon: 'Icon.16', persistent: false }),
       message,
-      ...(type !== 'error' && { persistent: false }),
     }, () => resolve());
   });
 }

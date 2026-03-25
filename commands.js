@@ -20,13 +20,6 @@ async function translateToFrysk(event) {
       return;
     }
 
-    // Tijdelijke debug: toon ruwe HTML zodat we de handtekening-structuur kunnen zien
-    if (!signatureHtml) {
-      await notify(item, 'info', 'HTML: ' + html.substring(0, 300));
-      event.completed();
-      return;
-    }
-
     const translation = await callFryskerAPI(text);
     const translatedHtml = rebuildHtml(bodyHtml, translation, signatureHtml);
 
@@ -52,6 +45,7 @@ function separateSignature(html) {
 
   // Bekende Outlook-selectors voor handtekeningen (van specifiek naar algemeen)
   const selectors = [
+    '#ms-outlook-mobile-signature',
     '#Signature',
     '#signature',
     '#appendonsend',

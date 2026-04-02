@@ -1,4 +1,4 @@
-/* global Office, DOMParser */
+/* global Office */
 
 Office.onReady(() => {
   Office.actions.associate('translateToFrysk', translateToFrysk);
@@ -8,22 +8,16 @@ async function translateToFrysk(event) {
   const item = Office.context.mailbox.item;
 
   try {
-    const html = await getBody(item, Office.CoercionType.Html);
+    const selected = await getSelectedData(item, Office.CoercionType.Text);
 
-    // Splits de handtekening af zodat die niet vertaald wordt
-    const { bodyHtml, signatureHtml } = separateSignature(html);
-    const text = extractText(bodyHtml);
-
-    if (!text.trim()) {
-      await notify(item, 'info', 'De e-mail bevat geen tekst om te vertalen.');
+    if (!selected || !selected.trim()) {
+      await notify(item, 'info', 'Selecteer eerst de te vertalen tekst.');
       event.completed();
       return;
     }
 
-    const translation = await callFryskerAPI(text);
-    const translatedHtml = rebuildHtml(bodyHtml, translation, signatureHtml);
-
-    await setBody(item, translatedHtml, Office.CoercionType.Html);
+    const translation = await callFryskerAPI(selected);
+    await setSelectedData(item, translation, Office.CoercionType.Text);
     await notify(item, 'info', 'Oersetting klear! ✓');
 
   } catch (err) {
@@ -31,75 +25,6 @@ async function translateToFrysk(event) {
   }
 
   event.completed();
-}
-
-// ------------------------------------------------------------
-
-/**
- * Herkent en scheidt de Outlook-handtekening van de berichttekst.
- * Outlook gebruikt bekende HTML-markers voor handtekeningen.
- * Geeft { bodyHtml, signatureHtml } terug — signatureHtml is null als er geen handtekening is.
- */
-function separateSignature(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-
-  // Bekende Outlook-selectors voor handtekeningen (van specifiek naar algemeen)
-  const selectors = [
-    '#ms-outlook-mobile-signature',
-    '#Signature',
-    '#signature',
-    '#appendonsend',
-    '.MsoSignature',
-    '[id^="Signature"]',
-    '[class*="MsoSignature"]',
-  ];
-
-  let signatureEl = null;
-  for (const selector of selectors) {
-    signatureEl = doc.body.querySelector(selector);
-    if (signatureEl) break;
-  }
-
-  if (!signatureEl) {
-    return { bodyHtml: html, signatureHtml: null };
-  }
-
-  // Sla de handtekening op en verwijder hem uit de DOM
-  const signatureHtml = signatureEl.outerHTML;
-  signatureEl.remove();
-
-  return { bodyHtml: doc.documentElement.outerHTML, signatureHtml };
-}
-
-/** Haalt platte tekst uit HTML met alineastructuur bewaard */
-function extractText(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  doc.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
-  doc.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6').forEach(el => {
-    if (el.textContent.trim()) el.insertAdjacentText('afterend', '\n\n');
-  });
-  return (doc.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/** Bouwt nieuwe HTML op met de vertaalde tekst, bewaart e-mailopmaak en handtekening */
-function rebuildHtml(originalHtml, translatedText, signatureHtml) {
-  const doc = new DOMParser().parseFromString(originalHtml, 'text/html');
-
-  const firstDiv = doc.body.querySelector('div[style]');
-  const containerStyle = firstDiv
-    ? firstDiv.getAttribute('style')
-    : 'font-family: Calibri, sans-serif; font-size: 11pt;';
-
-  const paragraphs = translatedText
-    .split('\n\n')
-    .filter(p => p.trim())
-    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
-    .join('');
-
-  // Vertaalde tekst + originele handtekening ongewijzigd eronder
-  const signature = signatureHtml ? signatureHtml : '';
-  doc.body.innerHTML = `<div style="${containerStyle}">${paragraphs}</div>${signature}`;
-  return doc.documentElement.outerHTML;
 }
 
 // ------------------------------------------------------------
@@ -130,9 +55,9 @@ async function callFryskerAPI(text) {
 
 // ------------------------------------------------------------
 
-function getBody(item, coercionType) {
+function getSelectedData(item, coercionType) {
   return new Promise((resolve, reject) => {
-    item.body.getAsync(coercionType, result => {
+    item.getSelectedDataAsync(coercionType, result => {
       result.status === Office.AsyncResultStatus.Succeeded
         ? resolve(result.value)
         : reject(new Error(result.error.message));
@@ -140,9 +65,9 @@ function getBody(item, coercionType) {
   });
 }
 
-function setBody(item, content, coercionType) {
+function setSelectedData(item, content, coercionType) {
   return new Promise((resolve, reject) => {
-    item.body.setAsync(content, { coercionType }, result => {
+    item.setSelectedDataAsync(content, { coercionType }, result => {
       result.status === Office.AsyncResultStatus.Succeeded
         ? resolve()
         : reject(new Error(result.error.message));

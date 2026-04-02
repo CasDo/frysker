@@ -8,7 +8,8 @@ async function translateToFrysk(event) {
   const item = Office.context.mailbox.item;
 
   try {
-    const selected = await getSelectedData(item, Office.CoercionType.Text);
+    const selectedResult = await getSelectedData(item, Office.CoercionType.Text);
+    const selected = selectedResult?.data ?? selectedResult;
 
     if (!selected || !selected.trim()) {
       await notify(item, 'info', 'Selecteer eerst de te vertalen tekst.');
